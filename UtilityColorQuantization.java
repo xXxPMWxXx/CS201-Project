@@ -5,7 +5,7 @@ public class UtilityColorQuantization {
 
     public void Compress(int[][][] pixels, String outputFileName) throws IOException {
 
-        int maxColors = 128;
+        int maxColors = 126;
         Cube cube = new Cube(pixels, maxColors);
         cube.classification();
         cube.reduction();

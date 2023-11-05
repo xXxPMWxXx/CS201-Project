@@ -10,7 +10,7 @@ public class App {/*  */
     public static void main(String[] args) throws IOException, ClassNotFoundException{
 
         //Create an instance of Utility
-        UtilityAvePixel Utility = new UtilityAvePixel();
+        Utility Utility = new Utility();
 
         //Define original file directory to loop through
         String ImageDirectory = "Original/";

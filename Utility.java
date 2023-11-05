@@ -1,25 +1,15 @@
 import java.io.*;
 import java.util.*;
+// import java.util.zip.*;
 
-public class UtilityAvePixel {
+public class Utility {
 
     public void Compress(int[][][] pixels, String outputFileName) throws IOException {
-        // The following is a bad implementation that we have intentionally put in the
-        // function to make App.java run, you should
-        // write code to reimplement the function without changing any of the input
-        // parameters, and making sure the compressed file
-        // gets written into outputFileName
-
 
         int[][][] compressedRGBPixels = averagePixels(pixels);
-
         // Step 1: Calculate the frequency of each color value
-
         Map<Integer, Integer> colorFrequency = new HashMap<>();
-        int width = compressedRGBPixels.length;
-        int height = 0;
         for (int[][] row : compressedRGBPixels) {
-            height = row.length;
             for (int[] pixel : row) {
                 for (int color : pixel) {
                     colorFrequency.put(color, colorFrequency.getOrDefault(color, 0) + 1);
@@ -28,8 +18,9 @@ public class UtilityAvePixel {
         }
 
         // Step 2: Build the Huffman tree
-        HuffmanTree huffmanTree = new HuffmanTree(width, height, 3);
+        HuffmanTree huffmanTree = new HuffmanTree(pixels.length, pixels[0].length, pixels[0][0].length);
         huffmanTree.buildHuffmanTree(colorFrequency);
+
         // Step 3: Create a mapping of color values to Huffman codes
         Map<Integer, String> huffmanCodes = huffmanTree.generateHuffmanCodes();
 
@@ -52,56 +43,68 @@ public class UtilityAvePixel {
         byte[] compressedDataBytes = convertBinaryStringToBytes(compressedDataString);
 
         // Step 5: Write the compressed data into the output file
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName))) {
-            oos.writeObject(huffmanTree); // Serialize Huffman tree for decoding
-            oos.writeObject(compressedDataBytes); // Serialize the compressed data
+        // apply GZIP
+        // try (ObjectOutputStream oos = new ObjectOutputStream(
+        // new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(outputFileName))))) {
 
-            int[] dimensions = {pixels.length, pixels[0].length};
-            oos.writeObject(dimensions);
+        // without GZIP
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName))) {
+            // Serialize Huffman tree for decoding
+            oos.writeObject(huffmanTree);
+            // Serialize the compressed data
+            oos.writeObject(compressedDataBytes);
         }
     }
 
     public int[][][] Decompress(String inputFileName) throws IOException, ClassNotFoundException {
+        // apply GZIP
+        // try (ObjectInputStream ois = new ObjectInputStream(
+        // new BufferedInputStream(new GZIPInputStream(new FileInputStream(inputFileName))))) {
+
+        // without GZIP
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(inputFileName))) {
             // Step 1: Read the Huffman tree from the input file
             Object huffmanTreeObject = ois.readObject();
-    
+
             if (huffmanTreeObject instanceof HuffmanTree) {
                 HuffmanTree huffmanTree = (HuffmanTree) huffmanTreeObject;
-    
+
                 // Step 2: Read the compressed data as a byte array
                 byte[] compressedDataByteArray = (byte[]) ois.readObject();
-    
-                // Step 3: Read the original width and height
-                int[] originalDimensions = (int[]) ois.readObject();
-                int originalWidth = originalDimensions[0];
-                int originalHeight = originalDimensions[1];
-    
+
+                // Step 3: Get the original width and height
+                int originalWidth = huffmanTree.getWidth();
+                int originalHeight = huffmanTree.getHeight();
+
                 // Step 4: Calculate the compressed width and height
                 int compressedWidth = originalWidth / 2;
                 int compressedHeight = originalHeight / 2;
-    
+
                 // Step 5: Reconstruct the original int[][][] pixel array
                 int colorDepth = huffmanTree.colorDepth;
                 int[][][] pixels = new int[originalWidth][originalHeight][colorDepth];
-    
-                int currentBit = 0; // Initialize the bit position
-                HuffmanTree.HuffmanNode currentNode = huffmanTree.root; // Start from the root of the Huffman tree
-    
+
+                // Initialize the bit position
+                int currentBit = 0;
+                // Start from the root of the Huffman tree
+                HuffmanTree.HuffmanNode currentNode = huffmanTree.root;
+
                 for (int x = 0; x < compressedWidth; x++) {
                     for (int y = 0; y < compressedHeight; y++) {
                         for (int z = 0; z < colorDepth; z++) {
-                            currentNode = huffmanTree.root; // Reset to the root for each pixel
+                            // Reset to the root for each pixel
+                            currentNode = huffmanTree.root;
                             while (true) {
-                                // Check if we've reached the end of the compressed data
+                                // Check if reached the end of the compressed data
                                 if (currentBit >= compressedDataByteArray.length * 8) {
-                                    return pixels; // Return the reconstructed image
+                                    // Return the reconstructed image
+                                    return pixels;
                                 }
-    
+
                                 if (currentNode.isLeaf()) {
-                                    // We've reached a leaf node, which represents a color value
+                                    // reached a leaf node, which represents a color value
                                     int color = currentNode.color;
-    
+
                                     // Determine the position in the decompressed array
                                     int decompressedX = x * 2;
                                     int decompressedY = y * 2;
@@ -112,11 +115,11 @@ public class UtilityAvePixel {
                                     pixels[decompressedX + 1][decompressedY + 1][z] = color;
                                     break;
                                 }
-    
+
                                 // Read one bit from the compressed data
                                 int bit = (compressedDataByteArray[currentBit >> 3] >> (7 - (currentBit % 8))) & 1;
                                 currentBit++;
-    
+
                                 // Traverse the Huffman tree based on the bit
                                 if (bit == 0) {
                                     currentNode = currentNode.left;
@@ -127,19 +130,17 @@ public class UtilityAvePixel {
                         }
                     }
                 }
-    
+
                 return pixels;
             } else {
                 throw new IOException("Invalid object type in the input file");
             }
         }
     }
-    
-    
-    
+
     public static byte[] convertBinaryStringToBytes(String binaryString) {
         int length = binaryString.length();
-        int byteCount = (length + 7) / 8; // Calculate the number of bytes required
+        int byteCount = (length + 7) / 8;
 
         byte[] bytes = new byte[byteCount];
 
@@ -240,20 +241,18 @@ public class UtilityAvePixel {
 
     }
 
-   
-
     public static int[][][] averagePixels(int[][][] pixels) {
         int width = pixels.length;
         int height = pixels[0].length;
-    
+
         int newWidth = width / 2;
         int newHeight = height / 2;
         int[][][] averagedPixels = new int[newWidth][newHeight][3];
-    
+
         for (int i = 0; i < newWidth; i++) {
             for (int j = 0; j < newHeight; j++) {
                 int sumR = 0, sumG = 0, sumB = 0;
-    
+
                 for (int x = i * 2; x < i * 2 + 2; x++) {
                     for (int y = j * 2; y < j * 2 + 2; y++) {
                         sumR += pixels[x][y][0];
@@ -261,20 +260,19 @@ public class UtilityAvePixel {
                         sumB += pixels[x][y][2];
                     }
                 }
-    
-                int avgR = sumR / 4;
-                int avgG = sumG / 4;
-                int avgB = sumB / 4;
-    
+
+                // rounding to near 10
+                int avgR = (sumR / 4) == 255 ? 250 : Math.round((sumR / 4) / (float) 10) * 10;
+                int avgG = (sumG / 4) == 255 ? 250 : Math.round((sumG / 4) / (float) 10) * 10;
+                int avgB = (sumB / 4) == 255 ? 250 : Math.round((sumB / 4) / (float) 10) * 10;
+
                 averagedPixels[i][j][0] = avgR;
                 averagedPixels[i][j][1] = avgG;
                 averagedPixels[i][j][2] = avgB;
             }
         }
-    
+
         return averagedPixels;
     }
-
-
 
 }
